@@ -1,0 +1,7 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ 
+
+# Avoid installing files under /usr/local
+override_dh_auto_install:

@@ -1,0 +1,29 @@
+Source: libraw
+Section: libs
+Priority: optional
+Maintainer: Luca Falavigna <dktrkranz@debian.org>
+Build-Depends: debhelper (>= 7.0.50~)
+Standards-Version: 3.8.4
+Homepage: http://www.libraw.org/
+Vcs-Git: git://git.debian.org/collab-maint/libraw.git
+Vcs-Browser: http://git.debian.org/?p=collab-maint/libraw.git;a=summary
+
+Package: libraw-dev
+Section: libdevel
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: raw image decoder library (development files)
+ LibRaw is a library for reading RAW files obtained from digital photo cameras
+ (CRW/CR2, NEF, RAF, DNG, and others).
+ .
+ This package contains a static library and header files.
+
+Package: libraw-doc
+Section: doc
+Architecture: all
+Depends: ${misc:Depends}
+Description: raw image decoder library (documentation)
+ LibRaw is a library for reading RAW files obtained from digital photo cameras
+ (CRW/CR2, NEF, RAF, DNG, and others).
+ .
+ This package contains documentation files.

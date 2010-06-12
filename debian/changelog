@@ -1,0 +1,5 @@
+libraw (0.9.1-1) unstable; urgency=low
+
+  * Initial release (Closes: #578830).
+
+ -- Luca Falavigna <dktrkranz@debian.org>  Sat, 12 Jun 2010 10:09:37 +0200
