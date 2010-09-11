@@ -3846,6 +3846,7 @@ void CLASS ppg_interpolate()
    the work of Keigo Hirakawa, Thomas Parks, and Paul Lee.
  */
 #define TS 256		/* Tile Size */
+#include "internal/dcraw_cbrt.cpp" /* static const float dcraw_cbrt[0x10000] = ... */
 #ifndef _OPENMP
 void CLASS ahd_interpolate()
 {
@@ -3853,7 +3854,7 @@ void CLASS ahd_interpolate()
   ushort (*pix)[4], (*rix)[3];
   static const int dir[4] = { -1, 1, -TS, TS };
   unsigned ldiff[2][4], abdiff[2][4], leps, abeps;
-  float r, cbrt[0x10000], xyz[3], xyz_cam[3][4];
+  float r, xyz[3], xyz_cam[3][4];
   ushort (*rgb)[TS][TS][3];
    short (*lab)[TS][TS][3], (*lix)[3];
    char (*homo)[TS][TS], *buffer;
@@ -3862,10 +3863,6 @@ void CLASS ahd_interpolate()
   if (verbose) fprintf (stderr,_("AHD interpolation...\n"));
 #endif
 
-  for (i=0; i < 0x10000; i++) {
-    r = i / 65535.0;
-    cbrt[i] = r > 0.008856 ? pow((double)r,1/3.0) : 7.787*r + 16/116.0;
-  }
   for (i=0; i < 3; i++)
     for (j=0; j < colors; j++)
       for (xyz_cam[i][j] = k=0; k < 3; k++)
@@ -3927,9 +3924,9 @@ void CLASS ahd_interpolate()
 	      xyz[1] += xyz_cam[1][c] * rix[0][c];
 	      xyz[2] += xyz_cam[2][c] * rix[0][c];
 	    }
-	    xyz[0] = cbrt[CLIP((int) xyz[0])];
-	    xyz[1] = cbrt[CLIP((int) xyz[1])];
-	    xyz[2] = cbrt[CLIP((int) xyz[2])];
+	    xyz[0] = dcraw_cbrt[CLIP((int) xyz[0])];
+	    xyz[1] = dcraw_cbrt[CLIP((int) xyz[1])];
+	    xyz[2] = dcraw_cbrt[CLIP((int) xyz[2])];
 	    lix[0][0] = 64 * (116 * xyz[1] - 16);
 	    lix[0][1] = 64 * 500 * (xyz[0] - xyz[1]);
 	    lix[0][2] = 64 * 200 * (xyz[1] - xyz[2]);
@@ -3985,7 +3982,7 @@ void CLASS ahd_interpolate()
   ushort (*pix)[4], (*rix)[3];
   static const int dir[4] = { -1, 1, -TS, TS };
   unsigned ldiff[2][4], abdiff[2][4], leps, abeps;
-  float r, cbrt[0x10000], xyz[3], xyz_cam[3][4];
+  float r, xyz[3], xyz_cam[3][4];
   ushort (*rgb)[TS][TS][3];
   short (*lab)[TS][TS][3], (*lix)[3];
   char (*homo)[TS][TS], *buffer;
@@ -3994,10 +3991,6 @@ void CLASS ahd_interpolate()
   if (verbose) fprintf (stderr,_("AHD interpolation...\n"));
 #endif
 
-  for (i=0; i < 0x10000; i++) {
-    r = i / 65535.0;
-    cbrt[i] = r > 0.008856 ? pow((double)r,1/3.0) : 7.787*r + 16/116.0;
-  }
   for (i=0; i < 3; i++)
     for (j=0; j < colors; j++)
       for (xyz_cam[i][j] = k=0; k < 3; k++)
@@ -4006,7 +3999,7 @@ void CLASS ahd_interpolate()
   border_interpolate(5);
 
 #ifdef LIBRAW_LIBRARY_BUILD
-#pragma omp parallel private(buffer,rgb,lab,homo,top,left,row,c,col,pix,val,d,rix,xyz,lix,tc,tr,ldiff,abdiff,leps,abeps,hm,i,j) firstprivate(cbrt) shared(xyz_cam)
+#pragma omp parallel private(buffer,rgb,lab,homo,top,left,row,c,col,pix,val,d,rix,xyz,lix,tc,tr,ldiff,abdiff,leps,abeps,hm,i,j) firstprivate(dcraw_cbrt) shared(xyz_cam)
 #endif
   {
     buffer = (char *) malloc (26*TS*TS);		/* 1664 kB */
@@ -4063,9 +4056,9 @@ void CLASS ahd_interpolate()
                 xyz[1] += xyz_cam[1][c] * rix[0][c];
                 xyz[2] += xyz_cam[2][c] * rix[0][c];
               }
-              xyz[0] = cbrt[CLIP((int) xyz[0])];
-              xyz[1] = cbrt[CLIP((int) xyz[1])];
-              xyz[2] = cbrt[CLIP((int) xyz[2])];
+              xyz[0] = dcraw_cbrt[CLIP((int) xyz[0])];
+              xyz[1] = dcraw_cbrt[CLIP((int) xyz[1])];
+              xyz[2] = dcraw_cbrt[CLIP((int) xyz[2])];
               lix[0][0] = 64 * (116 * xyz[1] - 16);
               lix[0][1] = 64 * 500 * (xyz[0] - xyz[1]);
               lix[0][2] = 64 * 200 * (xyz[1] - xyz[2]);

@@ -53,7 +53,7 @@ bin/dcraw_emu: lib/libraw.a samples/dcraw_emu.cpp
 
 #objects
 
-object/dcraw_common.o: internal/dcraw_common.cpp
+object/dcraw_common.o: internal/dcraw_common.cpp internal/dcraw_cbrt.cpp
 	g++ -c -DLIBRAW_NOTHREADS ${LCMS_DEF} ${CFLAGS} -o object/dcraw_common.o internal/dcraw_common.cpp
 
 object/dcraw_fileio.o: internal/dcraw_fileio.cpp
@@ -93,6 +93,9 @@ object/libraw_cxx_mt.o: src/libraw_cxx.cpp
 
 object/libraw_c_api_mt.o: src/libraw_c_api.cpp
 	g++ -c ${LCMS_DEF}  -pthread ${CFLAGS} -o object/libraw_c_api_mt.o src/libraw_c_api.cpp
+
+internal/dcraw_cbrt.cpp: internal/gen_dcraw_cbrt.py
+	python internal/gen_dcraw_cbrt.py > internal/dcraw_cbrt.cpp
 
 clean:
 	rm -fr bin/*.dSYM
