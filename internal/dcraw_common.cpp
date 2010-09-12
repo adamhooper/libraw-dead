@@ -3959,10 +3959,23 @@ void CLASS ahd_interpolate_combine_homogeneous_pixels(int top, int left, ushort 
   int hm[2];
   int c;
 
+  ushort (*pix)[4];
+  ushort (*rix[2])[3];
+
   for (row=top+3; row < top+TS-3 && row < height-5; row++) {
     tr = row-top;
+    pix = &image[row*width+left+2];
+    for (direction = 0; direction < 2; direction++) {
+      rix[direction] = &rgb[direction][tr][2];
+    }
+
     for (col=left+3; col < left+TS-3 && col < width-5; col++) {
       tc = col-left;
+      pix++;
+      for (direction = 0; direction < 2; direction++) {
+        rix[direction]++;
+      }
+
       for (direction=0; direction < 2; direction++) {
         hm[direction] = 0;
         for (i=tr-1; i <= tr+1; i++) {
@@ -3972,10 +3985,11 @@ void CLASS ahd_interpolate_combine_homogeneous_pixels(int top, int left, ushort 
         }
       }
       if (hm[0] != hm[1]) {
-        FORC3 image[row*width+col][c] = rgb[hm[1] > hm[0]][tr][tc][c];
+        memcpy(pix[0], rix[hm[1] > hm[0]][0], 3 * sizeof(ushort));
       } else {
-        FORC3 image[row*width+col][c] =
-          (rgb[0][tr][tc][c] + rgb[1][tr][tc][c]) >> 1;
+        FORC3 {
+          pix[0][c] = (rix[0][0][c] + rix[1][0][c]) >> 1;
+        }
       }
     }
   }
