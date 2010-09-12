@@ -3867,6 +3867,7 @@ void CLASS ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(int top, i
   ushort (*rix)[3];
   short (*lix)[3];
   float xyz[3];
+  const int width4 = 4*width;
 
   for (row = top+1; row < top+TS-1 && row < height-3; row++) {
     pix = image + row*width + left;
@@ -3885,11 +3886,11 @@ void CLASS ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(int top, i
         val = pix[0][1] + (( pix[-1][2-c] + pix[1][2-c]
               - rix[-1][1] - rix[1][1] ) >> 1);
         rix[0][2-c] = CLIP(val);
-        val = pix[0][1] + (( pix[-width][c] + pix[width][c]
+        val = pix[0][1] + (( pix[0][-width4+c] + pix[0][width4+c]
               - rix[-TS][1] - rix[TS][1] ) >> 1);
       } else {
-        val = rix[0][1] + (( pix[-width-1][c] + pix[-width+1][c]
-              + pix[+width-1][c] + pix[+width+1][c]
+        val = rix[0][1] + (( pix[0][-width4-4+c] + pix[0][-width4+4+c]
+              + pix[0][+width4-4+c] + pix[0][+width4+4+c]
               - rix[-TS-1][1] - rix[-TS+1][1]
               - rix[+TS-1][1] - rix[+TS+1][1] + 1) >> 2);
       }
