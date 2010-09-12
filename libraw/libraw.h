@@ -187,6 +187,12 @@ class DllDef LibRaw
     void        lin_interpolate();
     void        vng_interpolate();
     void        ppg_interpolate();
+    /* #define TS 256 */
+    void        ahd_interpolate_green_h_and_v(int top, int left, ushort (*out_rgb)[256][256][3]);
+    void        ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(int top, int left, int direction, ushort (*inout_rgb)[256][256][3], short (*out_lab)[256][256][3], const float (&xyz_cam)[3][4]);
+    void        ahd_interpolate_r_and_b_and_convert_to_cielab(int top, int left, ushort (*inout_rgb)[256][256][3], short (*out_lab)[256][256][3], const float (&xyz_cam)[3][4]);
+    void        ahd_interpolate_build_homogeneity_map(int top, int left, short (*lab)[256][256][3], char (*out_homogeneity_map)[256][256]);
+    void        ahd_interpolate_combine_homogeneous_pixels(int top, int left, ushort (*rgb)[256][256][3], char (*homogeneity_map)[256][256]);
     void        ahd_interpolate();
 
     void        bad_pixels(const char*);

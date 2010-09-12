@@ -3840,30 +3840,170 @@ void CLASS ppg_interpolate()
  */
 #define TS 256		/* Tile Size */
 #include "internal/dcraw_cbrt.cpp" /* static const float dcraw_cbrt[0x10000] = ... */
+void CLASS ahd_interpolate_green_h_and_v(int top, int left, ushort (*out_rgb)[TS][TS][3])
+{
+  int row, col;
+  int c, val;
+  ushort (*pix)[4];
+
+  for (row = top; row < top+TS && row < height-2; row++) {
+    col = left + (FC(row,left) & 1);
+    for (c = FC(row,col); col < left+TS && col < width-2; col+=2) {
+      pix = image + row*width+col;
+      val = ((pix[-1][1] + pix[0][c] + pix[1][1]) * 2
+            - pix[-2][c] - pix[2][c]) >> 2;
+      out_rgb[0][row-top][col-left][1] = ULIM(val,pix[-1][1],pix[1][1]);
+      val = ((pix[-width][1] + pix[0][c] + pix[width][1]) * 2
+            - pix[-2*width][c] - pix[2*width][c]) >> 2;
+      out_rgb[1][row-top][col-left][1] = ULIM(val,pix[-width][1],pix[width][1]);
+    }
+  }
+}
+void CLASS ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(int top, int left, int direction, ushort (*inout_rgb)[TS][TS][3], short (*out_lab)[TS][TS][3], const float (&xyz_cam)[3][4])
+{
+  int row, col;
+  int c, val;
+  ushort (*pix)[4];
+  ushort (*rix)[3];
+  short (*lix)[3];
+  float xyz[3];
+
+  for (row = top+1; row < top+TS-1 && row < height-3; row++) {
+    for (col = left+1; col < left+TS-1 && col < width-3; col++) {
+      pix = image + row*width+col;
+      rix = &inout_rgb[direction][row-top][col-left];
+      lix = &out_lab[direction][row-top][col-left];
+
+      c = 2 - FC(row, col);
+
+      if (c == 1) {
+        c = FC(row+1,col);
+        val = pix[0][1] + (( pix[-1][2-c] + pix[1][2-c]
+              - rix[-1][1] - rix[1][1] ) >> 1);
+        rix[0][2-c] = CLIP(val);
+        val = pix[0][1] + (( pix[-width][c] + pix[width][c]
+              - rix[-TS][1] - rix[TS][1] ) >> 1);
+      } else {
+        val = rix[0][1] + (( pix[-width-1][c] + pix[-width+1][c]
+              + pix[+width-1][c] + pix[+width+1][c]
+              - rix[-TS-1][1] - rix[-TS+1][1]
+              - rix[+TS-1][1] - rix[+TS+1][1] + 1) >> 2);
+      }
+      rix[0][c] = CLIP(val);
+      c = FC(row,col);
+      rix[0][c] = pix[0][c];
+      xyz[0] = xyz[1] = xyz[2] = 0.5;
+      FORCC {
+        xyz[0] += xyz_cam[0][c] * rix[0][c];
+        xyz[1] += xyz_cam[1][c] * rix[0][c];
+        xyz[2] += xyz_cam[2][c] * rix[0][c];
+      }
+      xyz[0] = dcraw_cbrt[CLIP((int) xyz[0])];
+      xyz[1] = dcraw_cbrt[CLIP((int) xyz[1])];
+      xyz[2] = dcraw_cbrt[CLIP((int) xyz[2])];
+      lix[0][0] = 64 * (116 * xyz[1] - 16);
+      lix[0][1] = 64 * 500 * (xyz[0] - xyz[1]);
+      lix[0][2] = 64 * 200 * (xyz[1] - xyz[2]);
+    }
+  }
+}
+void CLASS ahd_interpolate_r_and_b_and_convert_to_cielab(int top, int left, ushort (*inout_rgb)[TS][TS][3], short (*out_lab)[TS][TS][3], const float (&xyz_cam)[3][4])
+{
+  ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(top, left, 0, inout_rgb, out_lab, xyz_cam);
+  ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(top, left, 1, inout_rgb, out_lab, xyz_cam);
+}
+void CLASS ahd_interpolate_build_homogeneity_map(int top, int left, short (*lab)[256][256][3], char (*out_homogeneity_map)[256][256])
+{
+  int row, col;
+  int tr, tc;
+  int direction;
+  int i;
+  short (*lix)[3];
+  unsigned ldiff[2][4], abdiff[2][4], leps, abeps;
+  static const int dir[4] = { -1, 1, -TS, TS };
+
+  memset (out_homogeneity_map, 0, 2*TS*TS);
+  for (row=top+2; row < top+TS-2 && row < height-4; row++) {
+    tr = row-top;
+    for (col=left+2; col < left+TS-2 && col < width-4; col++) {
+      tc = col-left;
+      for (direction=0; direction < 2; direction++) {
+        lix = &lab[direction][tr][tc];
+        for (i=0; i < 4; i++) {
+          ldiff[direction][i] = ABS(lix[0][0]-lix[dir[i]][0]);
+          abdiff[direction][i] = SQR(lix[0][1]-lix[dir[i]][1])
+            + SQR(lix[0][2]-lix[dir[i]][2]);
+        }
+      }
+      leps = MIN(MAX(ldiff[0][0],ldiff[0][1]),
+          MAX(ldiff[1][2],ldiff[1][3]));
+      abeps = MIN(MAX(abdiff[0][0],abdiff[0][1]),
+          MAX(abdiff[1][2],abdiff[1][3]));
+      for (direction=0; direction < 2; direction++)
+        for (i=0; i < 4; i++)
+          if (ldiff[direction][i] <= leps && abdiff[direction][i] <= abeps)
+            out_homogeneity_map[direction][tr][tc]++;
+    }
+  }
+}
+void CLASS ahd_interpolate_combine_homogeneous_pixels(int top, int left, ushort (*rgb)[256][256][3], char (*homogeneity_map)[256][256])
+{
+  int row, col;
+  int tr, tc;
+  int i, j;
+  int direction;
+  int hm[2];
+  int c;
+
+  for (row=top+3; row < top+TS-3 && row < height-5; row++) {
+    tr = row-top;
+    for (col=left+3; col < left+TS-3 && col < width-5; col++) {
+      tc = col-left;
+      for (direction=0; direction < 2; direction++) {
+        hm[direction] = 0;
+        for (i=tr-1; i <= tr+1; i++) {
+          for (j=tc-1; j <= tc+1; j++) {
+            hm[direction] += homogeneity_map[direction][i][j];
+          }
+        }
+      }
+      if (hm[0] != hm[1]) {
+        FORC3 image[row*width+col][c] = rgb[hm[1] > hm[0]][tr][tc][c];
+      } else {
+        FORC3 image[row*width+col][c] =
+          (rgb[0][tr][tc][c] + rgb[1][tr][tc][c]) >> 1;
+      }
+    }
+  }
+}
 void CLASS ahd_interpolate()
 {
-  int i, j, k, top, left, row, col, tr, tc, c, d, val, hm[2];
-  ushort (*pix)[4], (*rix)[3];
-  static const int dir[4] = { -1, 1, -TS, TS };
-  unsigned ldiff[2][4], abdiff[2][4], leps, abeps;
-  float r, xyz[3], xyz_cam[3][4];
+  int i, j, k, top, left;
+  float xyz_cam[3][4];
+  char *buffer;
   ushort (*rgb)[TS][TS][3];
-  short (*lab)[TS][TS][3], (*lix)[3];
-  char (*homo)[TS][TS], *buffer;
+  short (*lab)[TS][TS][3];
+  char (*homo)[TS][TS];
 
 #ifdef DCRAW_VERBOSE
   if (verbose) fprintf (stderr,_("AHD interpolation...\n"));
 #endif
 
-  for (i=0; i < 3; i++)
-    for (j=0; j < colors; j++)
-      for (xyz_cam[i][j] = k=0; k < 3; k++)
-	xyz_cam[i][j] += xyz_rgb[i][k] * rgb_cam[k][j] / d65_white[i];
+  for (i=0; i < 3; i++) {
+    for (j=0; j < colors; j++) {
+      xyz_cam[i][j] = 0;
+      for (k=0; k < 3; k++) {
+        xyz_cam[i][j] += xyz_rgb[i][k] * rgb_cam[k][j] / d65_white[i];
+      }
+    }
+  }
 
   border_interpolate(5);
 
 #ifdef LIBRAW_LIBRARY_BUILD
-#pragma omp parallel private(buffer,rgb,lab,homo,top,left,row,c,col,pix,val,d,rix,xyz,lix,tc,tr,ldiff,abdiff,leps,abeps,hm,i,j) firstprivate(dcraw_cbrt) shared(xyz_cam)
+#ifdef _OPENMP
+#pragma omp parallel private(buffer,rgb,lab,homo,top,left,xyz,i,j,k) shared(xyz_cam)
+#endif
 #endif
   {
     buffer = (char *) malloc (26*TS*TS);		/* 1664 kB */
@@ -3872,101 +4012,18 @@ void CLASS ahd_interpolate()
     lab  = (short (*)[TS][TS][3])(buffer + 12*TS*TS);
     homo = (char  (*)[TS][TS])   (buffer + 24*TS*TS);
 
+#ifdef _OPENMP
 #pragma omp for schedule(dynamic)
+#endif
     for (top=2; top < height-5; top += TS-6){
 #ifdef LIBRAW_LIBRARY_BUILD
       RUN_CALLBACK(LIBRAW_PROGRESS_INTERPOLATE,top-2,height-7);
 #endif
       for (left=2; left < width-5; left += TS-6) {
-
-  /*  Interpolate green horizontally and vertically:		*/
-        for (row = top; row < top+TS && row < height-2; row++) {
-          col = left + (FC(row,left) & 1);
-          for (c = FC(row,col); col < left+TS && col < width-2; col+=2) {
-            pix = image + row*width+col;
-            val = ((pix[-1][1] + pix[0][c] + pix[1][1]) * 2
-                  - pix[-2][c] - pix[2][c]) >> 2;
-            rgb[0][row-top][col-left][1] = ULIM(val,pix[-1][1],pix[1][1]);
-            val = ((pix[-width][1] + pix[0][c] + pix[width][1]) * 2
-                  - pix[-2*width][c] - pix[2*width][c]) >> 2;
-            rgb[1][row-top][col-left][1] = ULIM(val,pix[-width][1],pix[width][1]);
-          }
-        }
-  /*  Interpolate red and blue, and convert to CIELab:		*/
-        for (d=0; d < 2; d++)
-          for (row=top+1; row < top+TS-1 && row < height-3; row++)
-            for (col=left+1; col < left+TS-1 && col < width-3; col++) {
-              pix = image + row*width+col;
-              rix = &rgb[d][row-top][col-left];
-              lix = &lab[d][row-top][col-left];
-              if ((c = 2 - FC(row,col)) == 1) {
-                c = FC(row+1,col);
-                val = pix[0][1] + (( pix[-1][2-c] + pix[1][2-c]
-                                   - rix[-1][1] - rix[1][1] ) >> 1);
-                rix[0][2-c] = CLIP(val);
-                val = pix[0][1] + (( pix[-width][c] + pix[width][c]
-                                   - rix[-TS][1] - rix[TS][1] ) >> 1);
-              } else
-                val = rix[0][1] + (( pix[-width-1][c] + pix[-width+1][c]
-                                   + pix[+width-1][c] + pix[+width+1][c]
-                                   - rix[-TS-1][1] - rix[-TS+1][1]
-                                   - rix[+TS-1][1] - rix[+TS+1][1] + 1) >> 2);
-              rix[0][c] = CLIP(val);
-              c = FC(row,col);
-              rix[0][c] = pix[0][c];
-              xyz[0] = xyz[1] = xyz[2] = 0.5;
-              FORCC {
-                xyz[0] += xyz_cam[0][c] * rix[0][c];
-                xyz[1] += xyz_cam[1][c] * rix[0][c];
-                xyz[2] += xyz_cam[2][c] * rix[0][c];
-              }
-              xyz[0] = dcraw_cbrt[CLIP((int) xyz[0])];
-              xyz[1] = dcraw_cbrt[CLIP((int) xyz[1])];
-              xyz[2] = dcraw_cbrt[CLIP((int) xyz[2])];
-              lix[0][0] = 64 * (116 * xyz[1] - 16);
-              lix[0][1] = 64 * 500 * (xyz[0] - xyz[1]);
-              lix[0][2] = 64 * 200 * (xyz[1] - xyz[2]);
-            }
-  /*  Build homogeneity maps from the CIELab images:		*/
-        memset (homo, 0, 2*TS*TS);
-        for (row=top+2; row < top+TS-2 && row < height-4; row++) {
-          tr = row-top;
-          for (col=left+2; col < left+TS-2 && col < width-4; col++) {
-            tc = col-left;
-            for (d=0; d < 2; d++) {
-              lix = &lab[d][tr][tc];
-              for (i=0; i < 4; i++) {
-                 ldiff[d][i] = ABS(lix[0][0]-lix[dir[i]][0]);
-                abdiff[d][i] = SQR(lix[0][1]-lix[dir[i]][1])
-                             + SQR(lix[0][2]-lix[dir[i]][2]);
-              }
-            }
-            leps = MIN(MAX(ldiff[0][0],ldiff[0][1]),
-                       MAX(ldiff[1][2],ldiff[1][3]));
-            abeps = MIN(MAX(abdiff[0][0],abdiff[0][1]),
-                        MAX(abdiff[1][2],abdiff[1][3]));
-            for (d=0; d < 2; d++)
-              for (i=0; i < 4; i++)
-                if (ldiff[d][i] <= leps && abdiff[d][i] <= abeps)
-                  homo[d][tr][tc]++;
-          }
-        }
-  /*  Combine the most homogenous pixels for the final result:	*/
-        for (row=top+3; row < top+TS-3 && row < height-5; row++) {
-          tr = row-top;
-          for (col=left+3; col < left+TS-3 && col < width-5; col++) {
-            tc = col-left;
-            for (d=0; d < 2; d++)
-              for (hm[d]=0, i=tr-1; i <= tr+1; i++)
-                for (j=tc-1; j <= tc+1; j++)
-                  hm[d] += homo[d][i][j];
-            if (hm[0] != hm[1])
-              FORC3 image[row*width+col][c] = rgb[hm[1] > hm[0]][tr][tc][c];
-            else
-              FORC3 image[row*width+col][c] =
-                  (rgb[0][tr][tc][c] + rgb[1][tr][tc][c]) >> 1;
-          }
-        }
+        ahd_interpolate_green_h_and_v(top, left, rgb);
+        ahd_interpolate_r_and_b_and_convert_to_cielab(top, left, rgb, lab, xyz_cam);
+        ahd_interpolate_build_homogeneity_map(top, left, lab, homo);
+        ahd_interpolate_combine_homogeneous_pixels(top, left, rgb, homo);
       }
     }
     free (buffer);
