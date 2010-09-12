@@ -3916,7 +3916,7 @@ void CLASS ahd_interpolate_r_and_b_and_convert_to_cielab(int top, int left, usho
   ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(top, left, 0, inout_rgb, out_lab, xyz_cam);
   ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(top, left, 1, inout_rgb, out_lab, xyz_cam);
 }
-void CLASS ahd_interpolate_build_homogeneity_map(int top, int left, short (*lab)[256][256][3], char (*out_homogeneity_map)[256][256])
+void CLASS ahd_interpolate_build_homogeneity_map(int top, int left, short (*lab)[256][256][3], char (*out_homogeneity_map)[TS][2])
 {
   int row, col;
   int tr, tc;
@@ -3925,12 +3925,18 @@ void CLASS ahd_interpolate_build_homogeneity_map(int top, int left, short (*lab)
   short (*lix)[3];
   unsigned ldiff[2][4], abdiff[2][4], leps, abeps;
   static const int dir[4] = { -1, 1, -TS, TS };
+  char (*homogeneity_map_p)[2];
 
   memset (out_homogeneity_map, 0, 2*TS*TS);
+
   for (row=top+2; row < top+TS-2 && row < height-4; row++) {
     tr = row-top;
+    homogeneity_map_p = &out_homogeneity_map[tr][1];
+
     for (col=left+2; col < left+TS-2 && col < width-4; col++) {
       tc = col-left;
+      homogeneity_map_p++;
+
       for (direction=0; direction < 2; direction++) {
         lix = &lab[direction][tr][tc];
         for (i=0; i < 4; i++) {
@@ -3946,11 +3952,11 @@ void CLASS ahd_interpolate_build_homogeneity_map(int top, int left, short (*lab)
       for (direction=0; direction < 2; direction++)
         for (i=0; i < 4; i++)
           if (ldiff[direction][i] <= leps && abdiff[direction][i] <= abeps)
-            out_homogeneity_map[direction][tr][tc]++;
+	    homogeneity_map_p[0][direction]++;
     }
   }
 }
-void CLASS ahd_interpolate_combine_homogeneous_pixels(int top, int left, ushort (*rgb)[256][256][3], char (*homogeneity_map)[256][256])
+void CLASS ahd_interpolate_combine_homogeneous_pixels(int top, int left, ushort (*rgb)[256][256][3], char (*homogeneity_map)[256][2])
 {
   int row, col;
   int tr, tc;
@@ -3980,7 +3986,7 @@ void CLASS ahd_interpolate_combine_homogeneous_pixels(int top, int left, ushort 
         hm[direction] = 0;
         for (i=tr-1; i <= tr+1; i++) {
           for (j=tc-1; j <= tc+1; j++) {
-            hm[direction] += homogeneity_map[direction][i][j];
+            hm[direction] += homogeneity_map[i][j][direction];
           }
         }
       }
@@ -4001,7 +4007,7 @@ void CLASS ahd_interpolate()
   char *buffer;
   ushort (*rgb)[TS][TS][3];
   short (*lab)[TS][TS][3];
-  char (*homo)[TS][TS];
+  char (*homo)[TS][2];
 
 #ifdef DCRAW_VERBOSE
   if (verbose) fprintf (stderr,_("AHD interpolation...\n"));
@@ -4028,7 +4034,7 @@ void CLASS ahd_interpolate()
     merror (buffer, "ahd_interpolate()");
     rgb  = (ushort(*)[TS][TS][3]) buffer;
     lab  = (short (*)[TS][TS][3])(buffer + 12*TS*TS);
-    homo = (char  (*)[TS][TS])   (buffer + 24*TS*TS);
+    homo = (char  (*)[TS][2])    (buffer + 24*TS*TS);
 
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
