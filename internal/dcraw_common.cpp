@@ -3859,10 +3859,12 @@ void CLASS ahd_interpolate_green_h_and_v(int top, int left, ushort (*out_rgb)[TS
   int row, col;
   int c, val;
   ushort (*pix)[4];
+  const int rowlimit = MIN(top+TS, height-2);
+  const int collimit = MIN(left+TS, width-2);
 
-  for (row = top; row < top+TS && row < height-2; row++) {
+  for (row = top; row < rowlimit; row++) {
     col = left + (FC(row,left) & 1);
-    for (c = FC(row,col); col < left+TS && col < width-2; col+=2) {
+    for (c = FC(row,col); col < collimit; col+=2) {
       pix = image + row*width+col;
       val = ((pix[-1][1] + pix[0][c] + pix[1][1]) * 2
             - pix[-2][c] - pix[2][c]) >> 2;
@@ -3882,13 +3884,15 @@ void CLASS ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(int top, i
   short (*lix)[3];
   float xyz[3];
   const int width4 = 4*width;
+  const int rowlimit = MIN(top+TS-1, height-3);
+  const int collimit = MIN(left+TS-1, width-3);
 
-  for (row = top+1; row < top+TS-1 && row < height-3; row++) {
+  for (row = top+1; row < rowlimit; row++) {
     pix = image + row*width + left;
     rix = &inout_rgb[direction][row-top][0];
     lix = &out_lab[direction][row-top][0];
 
-    for (col = left+1; col < left+TS-1 && col < width-3; col++) {
+    for (col = left+1; col < collimit; col++) {
       pix++;
       rix++;
       lix++;
@@ -3945,18 +3949,20 @@ void CLASS ahd_interpolate_build_homogeneity_map(int top, int left, short (*lab)
   short (*lixs[2])[3];
   unsigned ldiff[2][4], abdiff[2][4], leps, abeps;
   static const int dir[4] = { -1, 1, -TS, TS };
+  const int rowlimit = MIN(top+TS-2, height-4);
+  const int collimit = MIN(left+TS-2, width-4);
   char (*homogeneity_map_p)[2];
 
   memset (out_homogeneity_map, 0, 2*TS*TS);
 
-  for (row=top+2; row < top+TS-2 && row < height-4; row++) {
+  for (row=top+2; row < rowlimit; row++) {
     tr = row-top;
     homogeneity_map_p = &out_homogeneity_map[tr][1];
     for (direction=0; direction < 2; direction++) {
       lixs[direction] = &lab[direction][tr][1];
     }
 
-    for (col=left+2; col < left+TS-2 && col < width-4; col++) {
+    for (col=left+2; col < collimit; col++) {
       tc = col-left;
       homogeneity_map_p++;
 
@@ -3987,18 +3993,20 @@ void CLASS ahd_interpolate_combine_homogeneous_pixels(int top, int left, ushort 
   int direction;
   int hm[2];
   int c;
+  const int rowlimit = MIN(top+TS-3, height-5);
+  const int collimit = MIN(left+TS-3, width-5);
 
   ushort (*pix)[4];
   ushort (*rix[2])[3];
 
-  for (row=top+3; row < top+TS-3 && row < height-5; row++) {
+  for (row=top+3; row < rowlimit; row++) {
     tr = row-top;
     pix = &image[row*width+left+2];
     for (direction = 0; direction < 2; direction++) {
       rix[direction] = &rgb[direction][tr][2];
     }
 
-    for (col=left+3; col < left+TS-3 && col < width-5; col++) {
+    for (col=left+3; col < collimit; col++) {
       tc = col-left;
       pix++;
       for (direction = 0; direction < 2; direction++) {
