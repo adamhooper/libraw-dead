@@ -3923,6 +3923,7 @@ void CLASS ahd_interpolate_build_homogeneity_map(int top, int left, short (*lab)
   int direction;
   int i;
   short (*lix)[3];
+  short (*lixs[2])[3];
   unsigned ldiff[2][4], abdiff[2][4], leps, abeps;
   static const int dir[4] = { -1, 1, -TS, TS };
   char (*homogeneity_map_p)[2];
@@ -3932,13 +3933,16 @@ void CLASS ahd_interpolate_build_homogeneity_map(int top, int left, short (*lab)
   for (row=top+2; row < top+TS-2 && row < height-4; row++) {
     tr = row-top;
     homogeneity_map_p = &out_homogeneity_map[tr][1];
+    for (direction=0; direction < 2; direction++) {
+      lixs[direction] = &lab[direction][tr][1];
+    }
 
     for (col=left+2; col < left+TS-2 && col < width-4; col++) {
       tc = col-left;
       homogeneity_map_p++;
 
       for (direction=0; direction < 2; direction++) {
-        lix = &lab[direction][tr][tc];
+        lix = ++lixs[direction];
         for (i=0; i < 4; i++) {
           ldiff[direction][i] = ABS(lix[0][0]-lix[dir[i]][0]);
           abdiff[direction][i] = SQR(lix[0][1]-lix[dir[i]][1])
