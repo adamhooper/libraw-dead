@@ -3951,6 +3951,7 @@ void CLASS ahd_interpolate_build_homogeneity_map(int top, int left, short (*lab)
   static const int dir[4] = { -1, 1, -TS, TS };
   const int rowlimit = MIN(top+TS-2, height-4);
   const int collimit = MIN(left+TS-2, width-4);
+  int homogeneity;
   char (*homogeneity_map_p)[2];
 
   memset (out_homogeneity_map, 0, 2*TS*TS);
@@ -3978,10 +3979,15 @@ void CLASS ahd_interpolate_build_homogeneity_map(int top, int left, short (*lab)
           MAX(ldiff[1][2],ldiff[1][3]));
       abeps = MIN(MAX(abdiff[0][0],abdiff[0][1]),
           MAX(abdiff[1][2],abdiff[1][3]));
-      for (direction=0; direction < 2; direction++)
-        for (i=0; i < 4; i++)
-          if (ldiff[direction][i] <= leps && abdiff[direction][i] <= abeps)
-	    homogeneity_map_p[0][direction]++;
+      for (direction=0; direction < 2; direction++) {
+	homogeneity = 0;
+        for (i=0; i < 4; i++) {
+          if (ldiff[direction][i] <= leps && abdiff[direction][i] <= abeps) {
+	    homogeneity++;
+	  }
+	}
+	homogeneity_map_p[0][direction] = homogeneity;
+      }
     }
   }
 }
