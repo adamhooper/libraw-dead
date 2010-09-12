@@ -3840,6 +3840,20 @@ void CLASS ppg_interpolate()
  */
 #define TS 256		/* Tile Size */
 #include "internal/dcraw_cbrt.cpp" /* static const float dcraw_cbrt[0x10000] = ... */
+static float calc_cbrt(float f)
+{
+  unsigned u;
+
+  if (f <= 0) {
+    return dcraw_cbrt[0];
+  }
+
+  u = (unsigned) f;
+  if (u >= 0xffff) {
+    return dcraw_cbrt[0xffff];
+  }
+  return dcraw_cbrt[u];
+}
 void CLASS ahd_interpolate_green_h_and_v(int top, int left, ushort (*out_rgb)[TS][TS][3])
 {
   int row, col;
@@ -3898,14 +3912,18 @@ void CLASS ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(int top, i
       c = FC(row,col);
       rix[0][c] = pix[0][c];
       xyz[0] = xyz[1] = xyz[2] = 0.5;
-      FORCC {
+      FORC3 {
+	/*
+	 * Technically this ought to be FORCC, but the rest of
+	 * ahd_interpolate() assumes 3 colors so let's help the compiler.
+	 */
         xyz[0] += xyz_cam[0][c] * rix[0][c];
         xyz[1] += xyz_cam[1][c] * rix[0][c];
         xyz[2] += xyz_cam[2][c] * rix[0][c];
       }
-      xyz[0] = dcraw_cbrt[CLIP((int) xyz[0])];
-      xyz[1] = dcraw_cbrt[CLIP((int) xyz[1])];
-      xyz[2] = dcraw_cbrt[CLIP((int) xyz[2])];
+      FORC3 {
+	xyz[c] = calc_cbrt(xyz[c]);
+      }
       lix[0][0] = 64 * (116 * xyz[1] - 16);
       lix[0][1] = 64 * 500 * (xyz[0] - xyz[1]);
       lix[0][2] = 64 * 200 * (xyz[1] - xyz[2]);
