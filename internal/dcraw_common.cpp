@@ -3869,10 +3869,14 @@ void CLASS ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(int top, i
   float xyz[3];
 
   for (row = top+1; row < top+TS-1 && row < height-3; row++) {
+    pix = image + row*width + left;
+    rix = &inout_rgb[direction][row-top][0];
+    lix = &out_lab[direction][row-top][0];
+
     for (col = left+1; col < left+TS-1 && col < width-3; col++) {
-      pix = image + row*width+col;
-      rix = &inout_rgb[direction][row-top][col-left];
-      lix = &out_lab[direction][row-top][col-left];
+      pix++;
+      rix++;
+      lix++;
 
       c = 2 - FC(row, col);
 
