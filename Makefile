@@ -1,6 +1,6 @@
 all: library all_samples 
 
-CFLAGS=-O4  -I. -w
+CFLAGS=-O4  -I. -Wall -Wno-sign-compare -g
 
 # OpenMP support
 #CFLAGS=-O4  -I. -w -fopenmp
