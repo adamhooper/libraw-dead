@@ -3877,15 +3877,18 @@ void CLASS ahd_interpolate_green_h_and_v(int top, int left, ushort (*out_rgb)[TS
 }
 void CLASS ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(int top, int left, int direction, ushort (*inout_rgb)[TS][TS][3], short (*out_lab)[TS][TS][3], const float (&xyz_cam)[3][4])
 {
-  int row, col;
+  unsigned row, col;
   int c, val;
   ushort (*pix)[4];
   ushort (*rix)[3];
   short (*lix)[3];
   float xyz[3];
-  const int width4 = 4*width;
-  const int rowlimit = MIN(top+TS-1, height-3);
-  const int collimit = MIN(left+TS-1, width-3);
+  const unsigned num_pix_per_row = 4*width;
+  const unsigned rowlimit = MIN(top+TS-1, height-3);
+  const unsigned collimit = MIN(left+TS-1, width-3);
+  ushort *pix_above;
+  ushort *pix_below;
+  int t1, t2;
 
   for (row = top+1; row < rowlimit; row++) {
     pix = image + row*width + left;
@@ -3894,6 +3897,8 @@ void CLASS ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(int top, i
 
     for (col = left+1; col < collimit; col++) {
       pix++;
+      pix_above = &pix[0][0] - num_pix_per_row;
+      pix_below = &pix[0][0] + num_pix_per_row;
       rix++;
       lix++;
 
@@ -3901,14 +3906,17 @@ void CLASS ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(int top, i
 
       if (c == 1) {
         c = FC(row+1,col);
-        val = pix[0][1] + (( pix[-1][2-c] + pix[1][2-c]
+	t1 = 2-c;
+        val = pix[0][1] + (( pix[-1][t1] + pix[1][t1]
               - rix[-1][1] - rix[1][1] ) >> 1);
-        rix[0][2-c] = CLIP(val);
-        val = pix[0][1] + (( pix[0][-width4+c] + pix[0][width4+c]
+        rix[0][t1] = CLIP(val);
+        val = pix[0][1] + (( pix_above[c] + pix_below[c]
               - rix[-TS][1] - rix[TS][1] ) >> 1);
       } else {
-        val = rix[0][1] + (( pix[0][-width4-4+c] + pix[0][-width4+4+c]
-              + pix[0][+width4-4+c] + pix[0][+width4+4+c]
+	t1 = -4+c; /* -4+c: pixel of color c to the left */
+	t2 = 4+c; /* 4+c: pixel of color c to the right */
+        val = rix[0][1] + (( pix_above[t1] + pix_above[t2]
+              + pix_below[t1] + pix_below[t2]
               - rix[-TS-1][1] - rix[-TS+1][1]
               - rix[+TS-1][1] - rix[+TS+1][1] + 1) >> 2);
       }
