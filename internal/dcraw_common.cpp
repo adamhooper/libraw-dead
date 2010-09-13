@@ -3875,7 +3875,7 @@ void CLASS ahd_interpolate_green_h_and_v(int top, int left, ushort (*out_rgb)[TS
     }
   }
 }
-void CLASS ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(int top, int left, int direction, ushort (*inout_rgb)[TS][TS][3], short (*out_lab)[TS][TS][3], const float (&xyz_cam)[3][4])
+void CLASS ahd_interpolate_r_and_b_in_rgb_and_convert_to_cielab(int top, int left, ushort (*inout_rgb)[TS][3], short (*out_lab)[TS][3], const float (&xyz_cam)[3][4])
 {
   unsigned row, col;
   int c, val;
@@ -3892,8 +3892,8 @@ void CLASS ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(int top, i
 
   for (row = top+1; row < rowlimit; row++) {
     pix = image + row*width + left;
-    rix = &inout_rgb[direction][row-top][0];
-    lix = &out_lab[direction][row-top][0];
+    rix = &inout_rgb[row-top][0];
+    lix = &out_lab[row-top][0];
 
     for (col = left+1; col < collimit; col++) {
       pix++;
@@ -3944,8 +3944,10 @@ void CLASS ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(int top, i
 }
 void CLASS ahd_interpolate_r_and_b_and_convert_to_cielab(int top, int left, ushort (*inout_rgb)[TS][TS][3], short (*out_lab)[TS][TS][3], const float (&xyz_cam)[3][4])
 {
-  ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(top, left, 0, inout_rgb, out_lab, xyz_cam);
-  ahd_interpolate_r_and_b_in_direction_and_convert_to_cielab(top, left, 1, inout_rgb, out_lab, xyz_cam);
+  int direction;
+  for (direction = 0; direction < 2; direction++) {
+    ahd_interpolate_r_and_b_in_rgb_and_convert_to_cielab(top, left, inout_rgb[direction], out_lab[direction], xyz_cam);
+  }
 }
 void CLASS ahd_interpolate_build_homogeneity_map(int top, int left, short (*lab)[256][256][3], char (*out_homogeneity_map)[TS][2])
 {
