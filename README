@@ -1,0 +1,9 @@
+Website: http://www.libraw.org
+
+Based on dcraw, Dave Coffin's raw photo decoder, available for download
+at http://www.cybercom.net/~dcoffin/dcraw/
+
+Major improvements over dcras:
+* It's a library, not a binary
+* It's thread-safe
+* It's compiled as C++, not C
