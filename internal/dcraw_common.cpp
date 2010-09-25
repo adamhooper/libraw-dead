@@ -4075,7 +4075,7 @@ void CLASS ahd_interpolate()
 
 #ifdef LIBRAW_LIBRARY_BUILD
 #ifdef _OPENMP
-#pragma omp parallel private(buffer,rgb,lab,homo,top,left,xyz_cam,i,j,k)
+#pragma omp parallel private(buffer,rgb,lab,homo,top,left,i,j,k) shared(xyz_cam)
 #endif
 #endif
   {
