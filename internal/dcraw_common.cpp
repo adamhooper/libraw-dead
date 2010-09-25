@@ -3840,17 +3840,19 @@ void CLASS ppg_interpolate()
  */
 #define TS 256		/* Tile Size */
 #include "internal/dcraw_cbrt.cpp" /* static const float dcraw_cbrt[0x10000] = ... */
-static float calc_cbrt(float f)
+static float calc_64cbrt(float f)
 {
   unsigned u;
+  static float lower = dcraw_cbrt[0];
+  static float upper = dcraw_cbrt[0xffff];
 
   if (f <= 0) {
-    return dcraw_cbrt[0];
+    return lower;
   }
 
   u = (unsigned) f;
   if (u >= 0xffff) {
-    return dcraw_cbrt[0xffff];
+    return upper;
   }
   return dcraw_cbrt[u];
 }
@@ -3934,11 +3936,11 @@ void CLASS ahd_interpolate_r_and_b_in_rgb_and_convert_to_cielab(int top, int lef
         xyz[2] += xyz_cam[2][c] * rix[0][c];
       }
       FORC3 {
-	xyz[c] = calc_cbrt(xyz[c]);
+	xyz[c] = calc_64cbrt(xyz[c]);
       }
-      lix[0][0] = 64 * (116 * xyz[1] - 16);
-      lix[0][1] = 64 * 500 * (xyz[0] - xyz[1]);
-      lix[0][2] = 64 * 200 * (xyz[1] - xyz[2]);
+      lix[0][0] = (116 * xyz[1] - 16);
+      lix[0][1] = 500 * (xyz[0] - xyz[1]);
+      lix[0][2] = 200 * (xyz[1] - xyz[2]);
     }
   }
 }

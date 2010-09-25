@@ -14,7 +14,7 @@ def f(t):
 		return t**(1./3)
 	return 1./3*(29./6)**2*t + 4./29
 
-cbrts = map(lambda x: "%rf" % f(x/65535.), xrange(0, 0x10000))
+cbrts = map(lambda x: "%rf" % (64 * f(x/65535.)), xrange(0, 0x10000))
 print ',\n  '.join(cbrts)
 
 print '};\n'
