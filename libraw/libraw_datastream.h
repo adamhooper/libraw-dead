@@ -35,6 +35,8 @@ struct LibRaw_abstract_datastream;
 
 #include "libraw_const.h"
 #include "libraw_types.h"
+#include <fstream>
+#include <memory>
 
 class LibRaw_buffer_datastream;
 
@@ -71,97 +73,118 @@ class LibRaw_file_datastream : public LibRaw_abstract_datastream
 {
   public:
     LibRaw_file_datastream(const char *fname) 
-        { 
-            if(fname)
-                {filename = fname; f = fopen(fname,"rb");}
-            else 
-                {filename=0;f=0;}
-            sav=0;
-        }
+    { 
+      if(fname) {
+        filename = fname;
+        f.reset(new std::filebuf());
+        f->open(fname, std::ios_base::in | std::ios_base::binary);
+        if (!f->is_open()) f.reset();
+      } else  {
+        filename=0;
+      }
+    }
 
-    virtual ~LibRaw_file_datastream() {if(f)fclose(f); if(sav)fclose(sav);}
+    virtual int valid() { return f.get()?1:0;}
 
-    virtual int valid() { return f?1:0;}
-
-#define CHK() do {if(!f) throw LIBRAW_EXCEPTION_IO_EOF;}while(0)
+#define CHK() do {if(!f.get()) throw LIBRAW_EXCEPTION_IO_EOF;}while(0)
     virtual int read(void * ptr,size_t size, size_t nmemb) 
     { 
         CHK(); 
-        return substream?substream->read(ptr,size,nmemb):int(fread(ptr,size,nmemb,f));
+        if (substream) return substream->read(ptr, size, nmemb);
+
+        return f->sgetn(static_cast<char*>(ptr), nmemb * size) / size;
     }
     virtual int eof() 
     { 
         CHK(); 
-        return substream?substream->eof():feof(f);
+        if (substream) return substream->eof();
+        return f->sgetc() == EOF;
     }
     virtual int seek(INT64 o, int whence) 
     { 
         CHK(); 
-#if defined (WIN32) 
-#if __MSVCRT_VERSION__ >= 0x800
-        return substream?substream->seek(o,whence):_fseeki64(f,o,whence);
-#else
-        return substream?substream->seek(o,whence):fseek(f,(size_t)o,whence);
-#endif
-#else
-        return substream?substream->seek(o,whence):fseeko(f,o,whence);
-#endif
+        if (substream) return substream->seek(o, whence);
+
+        std::ios_base::seekdir dir;
+        switch (whence) {
+        case SEEK_SET: dir = std::ios_base::beg; break;
+        case SEEK_CUR: dir = std::ios_base::cur; break;
+        case SEEK_END: dir = std::ios_base::end; break;
+        default: dir = std::ios_base::beg;
+        }
+        return f->pubseekoff(o, dir);
     }
     virtual INT64 tell() 
     { 
         CHK(); 
-#if defined (WIN32)
-#if __MSVCRT_VERSION__ >= 0x800
-        return substream?substream->tell():_ftelli64(f);
-#else
-        return substream?substream->tell():ftell(f);
-#endif
-#else
-        return substream?substream->tell():ftello(f);
-#endif
+        if (substream) return substream->tell();
+        return f->pubseekoff(0, std::ios_base::cur);
     }
     virtual int get_char() 
     { 
         CHK(); 
-        return substream?substream->get_char():fgetc(f);
+        if (substream) return substream->get_char();
+        return f->sbumpc();
     }
     virtual char* gets(char *str, int sz) 
     { 
         CHK(); 
-        return substream?substream->gets(str,sz):fgets(str,sz,f);
+        if (substream) return substream->gets(str, sz);
+
+        std::istream is(f.get());
+        is.getline(str, sz);
+        if (is.fail()) return 0;
+        return str;
     }
     virtual int scanf_one(const char *fmt, void*val) 
     { 
         CHK(); 
-        return substream?substream->scanf_one(fmt,val):fscanf(f,fmt,val);
+        if (substream) return substream->scanf_one(fmt, val);
+
+        std::istream is(f.get());
+
+        /* HUGE ASSUMPTION: *fmt is either "%d" or "%f" */
+        if (strcmp(fmt, "%d") == 0) {
+          int d;
+          is >> d;
+          if (is.fail()) return EOF;
+          *(static_cast<int*>(val)) = d;
+        } else {
+          float f;
+          is >> f;
+          if (is.fail()) return EOF;
+          *(static_cast<float*>(val)) = f;
+        }
+
+        return 1;
     }
 
     virtual const char *fname() { return filename; }
 
     virtual int subfile_open(const char *fn)
     {
-        if(sav) return EBUSY;
-        sav = f;
-        f = fopen(fn,"rb");
-        if(!f)
-            {
-                f = sav;
-                sav = NULL;
-                return ENOENT;
-            }
+        if (saved_f.get()) return EBUSY;
+
+        saved_f = f;
+
+        f.reset(new std::filebuf());
+        f->open(fn, std::ios_base::in | std::ios_base::binary);
+        if (!f->is_open()) {
+          f = saved_f;
+          return ENOENT;
+        }
         else
-            return 0;
+          return 0;
     }
     virtual void subfile_close()
     {
-        if(!sav) return;
-        fclose(f);
-        f = sav;
-        sav = 0;
+        if (!saved_f.get()) return;
+        f = saved_f;
     }
 
   private:
-    FILE *f,*sav;
+    std::auto_ptr<std::filebuf> f; /* will close() automatically through dtor */
+    std::auto_ptr<std::filebuf> saved_f; /* when *f is a subfile, *saved_f is the master file */
     const char *filename;
 };
 #undef CHK
